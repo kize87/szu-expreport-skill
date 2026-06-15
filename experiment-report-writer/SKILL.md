@@ -19,6 +19,18 @@ Generate polished English experiment reports from lab requirements, code, data, 
 6. Use `references/code-and-pseudocode.md` before inserting any pseudocode or core code excerpt.
 7. Use `references/richness-check-prompt.md` when entering the post-draft richness QA loop.
 
+## Reading Binary Documents (PDF / DOCX / DOC) — Mandatory
+
+**Never open `.pdf`, `.docx`, or `.doc` files with the `Read` tool.** The Read tool returns binary documents as a `document` content block, which is only supported by official Anthropic Claude models. Third-party Anthropic-compatible backends (GLM, GPT-via-proxy, OpenRouter, custom routers, …) reject `document` content with HTTP 400, breaking the session before this skill can do anything useful.
+
+Use the script-based path instead — the data flows as plain text, so every backend works:
+
+- **PDF** (lab requirements, reference papers): `python scripts/read_pdf_text.py <file.pdf>` → plain UTF-8 on stdout. Pipe to a temp file with `--output` for large PDFs.
+- **DOCX** (templates, reference reports): `python scripts/inspect_docx.py <file.docx>` → readable text dump, or `--json` for structural counts.
+- **DOC (legacy)**: convert first with `scripts/convert_doc_to_docx.sh` or `scripts/prepare_master_template.sh`, then read the resulting `.docx`.
+
+If a tool result still arrives as a `document` block (for example because the user attached a file directly to the conversation), do not pass it back into another tool call's input on a non-Claude backend — extract the relevant text first or ask the user to drop the file into the working directory and refer to it by path.
+
 ## Inputs To Discover
 
 Scan the working directory before asking the user questions. Identify:
@@ -46,8 +58,9 @@ The workflow has five phases: **Prepare**, **Understand**, **Plan**, **Implement
 
 This phase is required even when the user is in a hurry. The goal is to internalize the experiment so the rest of the work is informed, not improvised.
 
-- Read the lab requirements in full. If they are in Chinese, translate them and preserve every concrete task, dataset, model, parameter, submission constraint, and expected output.
-- Read the existing code top-to-bottom — not just the entry script. Map out the data path, preprocessing transforms, model definitions, training loop, evaluation, and any plotting helpers.
+- Read the lab requirements in full. PDFs go through `python scripts/read_pdf_text.py <file.pdf>`; never open them with the `Read` tool. If the requirements are in Chinese, translate them and preserve every concrete task, dataset, model, parameter, submission constraint, and expected output.
+- Read template DOCX and reference reports through `python scripts/inspect_docx.py <file.docx>`; legacy `.doc` go through `scripts/convert_doc_to_docx.sh` first. Do not open binary docx with the `Read` tool — it triggers `document` content blocks that non-Claude API backends reject.
+- Read the existing code top-to-bottom — not just the entry script. Map out the data path, preprocessing transforms, model definitions, training loop, evaluation, and any plotting helpers. `.py` and `.ipynb` files are safe with the `Read` tool.
 - Inspect the data shape: number of samples, feature columns and dtypes, class balance, missing-value pattern, value ranges. Run small probes (`df.head()`, `df.describe()`, `df.info()`, value counts) when needed.
 - Read any existing reference report or completed sample to learn the tone, depth, and figure style the user expects.
 - Write a short internal "experiment brief" noting: what the assignment really asks for, what the code already does, what the data looks like, and where the gaps are. Keep this brief in your context for the next phase; do not paste it into the final report verbatim.
@@ -97,7 +110,8 @@ Run these checks in order. The richness gate may loop back into phases 3–4 up 
 
 ## Helper Scripts
 
-- `scripts/inspect_docx.py`: Extract text and basic OOXML structure from a `.docx`.
+- `scripts/inspect_docx.py`: Extract text and basic OOXML structure from a `.docx`. Use this instead of the `Read` tool for any docx.
+- `scripts/read_pdf_text.py`: Extract plain UTF-8 text from a `.pdf`. Use this instead of the `Read` tool for any PDF; required on non-Claude API backends because `Read` returns PDFs as `document` content blocks that those backends reject.
 - `scripts/validate_report_docx.py`: Check required sections, common report formatting hazards, three-line table borders, and body first-line indentation.
 - `scripts/report_quality_harness.py`: Check editable equations, minimum report depth, and optional cover/template signature preservation.
 - `scripts/check_report_richness.py`: Count figures, tables, formulas, pseudocode and code blocks; estimate per-section coverage; emit JSON for the richness subagent.

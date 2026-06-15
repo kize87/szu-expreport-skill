@@ -33,6 +33,16 @@ class ScriptContractsTest(unittest.TestCase):
         self.assertIn("check_report_richness.py", skill)
         self.assertIn("richness-check-prompt.md", skill)
 
+    def test_skill_forbids_read_tool_on_binary_documents(self):
+        # Non-Claude backends (GLM, GPT-via-proxy, etc.) reject `document`
+        # content blocks that the Read tool emits for PDFs and DOCX. The
+        # skill must steer users toward the scripted text-only path.
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("read_pdf_text.py", skill)
+        self.assertIn("Never open", skill)
+        self.assertIn("`Read` tool", skill)
+        self.assertTrue((ROOT / "scripts" / "read_pdf_text.py").exists())
+
     def test_visualization_references_exist(self):
         self.assertTrue((ROOT / "references" / "visualization-strategy.md").exists())
         self.assertTrue((ROOT / "references" / "visual-review-prompt.md").exists())

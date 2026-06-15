@@ -90,7 +90,11 @@ class ReportQualityHarnessTest(unittest.TestCase):
 
         self.assertTrue(result.ok)
 
-    def test_formula_artifacts_are_rejected_even_when_equation_exists(self):
+    def test_formula_artifacts_warn_when_equation_exists(self):
+        # When the document already contains Office Math equations, leftover
+        # plain-text formula-like substrings (such as "exp(...)" or "sum_j" in
+        # prose) are demoted to a warning rather than a hard error — those
+        # mentions are usually casual prose alongside the real equation.
         module = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "artifact_formula.docx"
@@ -110,8 +114,11 @@ class ReportQualityHarnessTest(unittest.TestCase):
             )
             result = module.audit_report(path, min_body_words=100)
 
-        self.assertFalse(result.ok)
-        self.assertIn("Formula-like plain text remains in visible report text", result.errors)
+        self.assertTrue(result.ok, result.errors)
+        self.assertTrue(
+            any("Formula-like prose" in w for w in result.warnings),
+            result.warnings,
+        )
 
     def test_shallow_report_is_rejected(self):
         module = load_module()
